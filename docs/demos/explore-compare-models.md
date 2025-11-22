@@ -42,8 +42,8 @@
 
 ---
 
-​**Instructions**: Return to the **Model Catalog**. Navigate to the **Azure AI Foundry GPT-4o** model is located.
+​**Instructions**: Return to the **Model Catalog**. Navigate to the **Microsoft Foundry GPT-4o** model is located.
 
-**Script**: With the model chosen, we can move forward w/ prototyping the agent. If you recall, Zava is an Azure customer and as such, Serena plans to use an Azure AI Foundry-hosted model in production. Fortunately, GPT-4o is also available w/ Azure AI Foundry and therefore, we’ll deploy GPT-4o w/ Azure AI Foundry now. With the AI Foundry model, Zava gains enhanced performance, scalability, and security. Not to mention, enterprise-grade Service Level Agreements.​
+**Script**: With the model chosen, we can move forward w/ prototyping the agent. If you recall, Zava is an Azure customer and as such, Serena plans to use a Microsoft Foundry-hosted model in production. Fortunately, GPT-4o is also available w/ Foundry and therefore, we’ll deploy GPT-4o w/ Foundry now. With the AI Foundry model, Zava gains enhanced performance, scalability, and security. Not to mention, enterprise-grade Service Level Agreements.​
 ​
-Now that the model has been deployed, it appears in My Models within my Azure AI Foundry models.​
+Now that the model has been deployed, it appears in My Models within my Microsoft Foundry models.​

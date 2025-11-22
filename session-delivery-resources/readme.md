@@ -53,7 +53,7 @@ This demo is designed to be run in a development container for easy setup. The c
 
 #### Prerequisites
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed
-- Azure AI Foundry project with a **GPT-4o** model deployment
+- Microsoft Foundry project with a **GPT-4o** model deployment
 - [Visual Studio Code](https://code.visualstudio.com)
 
 **Open the repository in the dev container**
@@ -72,17 +72,17 @@ Confirm that the dev container has installed the following extensions:
 
 If any extension is missing, install before moving forward.
 
-*Note: The [Azure AI Foundry](https://marketplace.visualstudio.com/items?itemName=TeamsDevApp.vscode-ai-foundry) extension is installed as a bundle with the AI Toolkit*.
+*Note: The [Microsoft Foundry](https://marketplace.visualstudio.com/items?itemName=TeamsDevApp.vscode-ai-foundry) extension is installed as a bundle with the AI Toolkit*.
 
 **Sign-in to the Azure Resources extension and set your default project.**
 
 1. In the **Azure Resources** extension, select **Sign in to Azure**.
-1. Sign-in to the account that has your Azure AI Foundry project and GPT-4o deployed model.
-1. Open the **Azure AI Foundry** extension (*note: the Azure AI Foundry extension comes installed with the AI Toolkit*).
-1. Under the **Resources** section, confirm whether your Azure AI Foundry project is set as the default project. The default project displays under **Resources** with a **Default** label.
+1. Sign-in to the account that has your Microsoft Foundry project and GPT-4o deployed model.
+1. Open the **Microsoft Foundry** extension (*note: the Microsoft Foundry extension comes installed with the AI Toolkit*).
+1. Under the **Resources** section, confirm whether your Microsoft Foundry project is set as the default project. The default project displays under **Resources** with a **Default** label.
 1. If your project is **not** set as the default project, hover over the project name and click the **Switch Default Project in Azure Extension** icon (*note: the icon looks like 3 lines*).
-1. In the **Pick a project** window, select the subscription that has your Azure AI Foundry project.
-1. In the **Pick a project** window, select your Azure AI Foundry project.
+1. In the **Pick a project** window, select the subscription that has your Microsoft Foundry project.
+1. In the **Pick a project** window, select your Microsoft Foundry project.
 
 **Setup environment variables**
 1. In the terminal, run the command: `cp .env.example .env`

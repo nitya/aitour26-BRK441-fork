@@ -4,7 +4,7 @@
 
 # [Microsoft AI Tour 2026](https://aitour.microsoft.com)
 
-## 🔥BRK441: Build and launch AI agents fast with Azure AI Foundry and the AI Toolkit
+## 🔥BRK441: Build and launch AI agents fast with Microsoft Foundry and the AI Toolkit
 
 [![Microsoft Foundry Discord](https://dcbadge.limes.pink/api/server/Pwpvf3TWaw)](https://aka.ms/MicrosoftFoundryDiscord-AITour26)
 [![Microsoft Foundry Developer Forum](https://img.shields.io/badge/GitHub-Microsoft_Foundry_Developer_Forum-blue?style=for-the-badge&logo=github&color=adff2f&logoColor=fff)](https://aka.ms/MicrosoftFoundryForum-AITour26)
@@ -13,15 +13,15 @@ If you will be delivering this session, check the [session-delivery-sources](./s
 
 ### Session Description
 
-Build and ship AI agents faster with Azure AI Foundry Models and Azure. Prototype with open models, scale with Azure AI Foundry models, and streamline workflows using the AI Toolkit in VS Code. Experiment with models and prompts, evaluate agent responses, then move from prototype to cloud with cutting-edge developer tools.
+Build and ship AI agents faster with Microsoft Foundry Models and Azure. Prototype with open models, scale with Foundry models, and streamline workflows using the AI Toolkit in VS Code. Experiment with models and prompts, evaluate agent responses, then move from prototype to cloud with cutting-edge developer tools.
 
 ### 🧠 Learning Outcomes
 
 By the end of this session, learners will be able to:
 
 - Explore and compare models with the AI Toolkit Playground; iterate over prompts using the Agent Builder and evaluate results on a test dataset.
-- Move from prototype to code, combining your models and prompts with your app code with Visual Studio Code and Azure AI Foundry.
-- Go smoothly into production by leveraging pre-built enterprise-ready features of Azure AI Foundry to deploy, safeguard and monitor your AI agent over time.
+- Move from prototype to code, combining your models and prompts with your app code with Visual Studio Code and Microsoft Foundry.
+- Go smoothly into production by leveraging pre-built enterprise-ready features of Microsoft Foundry to deploy, safeguard and monitor your AI agent over time.
 
 ### 💻 Technologies Used
 
@@ -41,7 +41,7 @@ By the end of this session, learners will be able to:
 | Resources          | Links                             | Description        |
 |:-------------------|:----------------------------------|:-------------------|
 | AI Tour 2026 Resource Center | https://aka.ms/AITour26-Resource-center | Links to all repos for AI Tour 26 Sessions |
-| Azure AI Foundry Community Discord | [![Microsoft Foundry Discord](https://dcbadge.limes.pink/api/server/Pwpvf3TWaw)](https://aka.ms/MicrosoftFoundryDiscord-AITour26)| Connect with the Azure AI Foundry Community! |
+| Microsoft Foundry Community Discord | [![Microsoft Foundry Discord](https://dcbadge.limes.pink/api/server/Pwpvf3TWaw)](https://aka.ms/MicrosoftFoundryDiscord-AITour26)| Connect with the Azure AI Foundry Community! |
 | Learn at AI Tour | https://aka.ms/LearnAtAITour | Continue learning on Microsoft Learn |
 
 ### 🌐 Multi-Language Support
