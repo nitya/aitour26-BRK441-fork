@@ -23,16 +23,10 @@ SHARED_STATIC_DIR = BASE_SRC_DIR / "shared" / "static"
 STATIC_DIR = SHARED_STATIC_DIR if SHARED_STATIC_DIR.exists() else Path("static")
 TEMPLATES_DIR = STATIC_DIR if STATIC_DIR.exists() else Path("templates")
 
-# MCP imports
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
-from mcp.client.sse import sse_client
-
-# Azure AI imports
-from azure.ai.inference import ChatCompletionsClient
-from azure.ai.inference.models import AssistantMessage, SystemMessage, UserMessage, ToolMessage
-from azure.ai.inference.models import ImageContentItem, ImageUrl, TextContentItem
-from azure.core.credentials import AzureKeyCredential
+# Agent Framework imports
+from agent_framework import ChatAgent, MCPStdioTool, ToolProtocol, ChatMessage, TextContent, DataContent
+from agent_framework.azure import AzureAIClient
+from azure.identity.aio import AzureCliCredential
 
 
 from dotenv import load_dotenv
@@ -66,164 +60,25 @@ def get_image_mime_type(filename: str) -> str:
     }
     return mime_types.get(extension, 'image/jpeg')
 
-class MCPClient:
-    """MCP Client for connecting to Model Context Protocol servers"""
-    def __init__(self):
-        # Initialize session and client objects
-        self._servers = {}
-        self._tool_to_server_map = {}
-        self.exit_stack = AsyncExitStack()
-        # To authenticate with the model you will need to generate a personal access token (PAT) in your GitHub settings.
-        # Create your PAT token by following instructions here: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens
-        self.azureai = ChatCompletionsClient(
-            endpoint = os.environ["AZURE_AI_ENDPOINT"],
-            credential = AzureKeyCredential(os.environ["AZURE_AI_API_KEY"]),
-            api_version = "2025-01-01-preview",
-        )
+# Agent Framework Configuration - matching cora-agent-demo.py
+ENDPOINT = os.environ.get("AZURE_AI_FOUNDRY_ENDPOINT", "your_foundry_endpoint_here")
+MODEL_DEPLOYMENT_NAME = os.environ.get("MODEL_DEPLOYMENT_NAME", "gpt-4.1-mini")
+AGENT_NAME = "cora-web-agent"
 
-    async def connect_stdio_server(self, server_id: str, command: str, args: list[str], env: Dict[str, str]):
-        """Connect to an MCP server using STDIO transport
-        
-        Args:
-            server_id: Unique identifier for this server connection
-            command: Command to run the MCP server
-            args: Arguments for the command
-            env: Optional environment variables
-        """
-        server_params = StdioServerParameters(
-            command=command,
-            args=args,
-            env=env
-        )
-        
-        stdio_transport = await self.exit_stack.enter_async_context(stdio_client(server_params))
-        stdio, write = stdio_transport
-        session = await self.exit_stack.enter_async_context(ClientSession(stdio, write))
-        await session.initialize()
-        
-        # Register the server
-        await self._register_server(server_id, session)
-    
-    async def connect_sse_server(self, server_id: str, url: str, headers: Dict[str, str]):
-        """Connect to an MCP server using SSE transport
-        
-        Args:
-            server_id: Unique identifier for this server connection
-            url: URL of the SSE server
-            headers: Optional HTTP headers
-        """
-        sse_context = await self.exit_stack.enter_async_context(sse_client(url=url, headers=headers))
-        read, write = sse_context
-        session = await self.exit_stack.enter_async_context(ClientSession(read, write))
-        await session.initialize()
-        
-        # Register the server
-        await self._register_server(server_id, session)
-    
-    async def _register_server(self, server_id: str, session: ClientSession):
-        """Register a server and its tools in the client
-        
-        Args:
-            server_id: Unique identifier for this server
-            session: Connected ClientSession
-        """
-        # List available tools
-        response = await session.list_tools()
-        tools = response.tools
-        
-        # Store server connection info
-        self._servers[server_id] = {
-            "session": session,
-            "tools": tools
-        }
-        
-        # Update tool-to-server mapping
-        for tool in tools:
-            self._tool_to_server_map[tool.name] = server_id
-            
-        print(f"\nConnected to server '{server_id}' with tools:", [tool.name for tool in tools])
-
-    async def chatWithTools(self, messages: list[any]) -> str:
-        """Chat with model and using tools
-        Args:
-            messages: Messages to send to the model
-        """
-        if not self._servers:
-            raise ValueError("No MCP servers connected. Connect to at least one server first.")
-
-        # Collect tools from all connected servers
-        available_tools = []
-        for server_id, server_info in self._servers.items():
-            for tool in server_info["tools"]:
-                available_tools.append({ 
-                    "type": "function",
-                    "function": {
-                        "name": tool.name,
-                        "description": tool.description,
-                        "parameters": tool.inputSchema
-                    },
-                })
-
-        while True:
-
-            # Call model
-            response = self.azureai.complete(
-                messages = messages,
-                model = "gpt-4o",
-                tools=available_tools,
-                max_tokens = 4096,
-            )
-            hasToolCall = False
-
-            if response.choices[0].message.tool_calls:
-                for tool in response.choices[0].message.tool_calls:
-                    hasToolCall = True
-                    tool_name = tool.function.name
-                    tool_args = json.loads(tool.function.arguments)
-                    messages.append(
-                        AssistantMessage(
-                            tool_calls = [{
-                                "id": tool.id,
-                                "type": "function",
-                                "function": {
-                                    "name": tool.function.name,
-                                    "arguments": tool.function.arguments,
-                                }
-                            }]
-                        )
-                    )
-                
-                
-                    # Find the appropriate server for this tool
-                    if tool_name in self._tool_to_server_map:
-                        server_id = self._tool_to_server_map[tool_name]
-                        server_session = self._servers[server_id]["session"]
-                        
-                        # Execute tool call on the appropriate server
-                        result = await server_session.call_tool(tool_name, tool_args)
-                        print(f"[Server '{server_id}' call tool '{tool_name}' with args {tool_args}]: {result.content}")
-
-                        messages.append(
-                            ToolMessage(
-                                tool_call_id = tool.id,
-                                content = str(result.content)
-                            )
-                        )
-            else:
-                messages.append(
-                    AssistantMessage(
-                        content = response.choices[0].message.content
-                    )
-                )
-                print(f"[Model Response]: {response.choices[0].message.content}")
-        
-            if not hasToolCall:
-                break
-    
-    async def cleanup(self):
-        """Clean up resources"""
-        await self.exit_stack.aclose()
-        await asyncio.sleep(1)
+def create_mcp_tools() -> list[ToolProtocol]:
+    """Create MCP tools for the agent"""
+    return [
+        MCPStdioTool(
+            name="zava_customer_sales_stdio",
+            description="MCP server for Zava customer sales analysis",
+            command="python",
+            args=[
+                "src/python/mcp_server/customer_sales/customer_sales.py",
+                "--stdio",
+                "--RLS_USER_ID=00000000-0000-0000-0000-000000000000",
+            ]
+        ),
+    ]
 
 app = FastAPI(title="AI Agent Chat Demo", version="1.0.0")
 
@@ -232,46 +87,63 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
-# Global MCP client instance
-mcp_client = None
+# Global agent instance and thread storage
+agent_instance = None
+credential_instance = None
+agent_threads = {}  # Store threads per session
 
-# System message for Cora AI assistant
-CORA_SYSTEM_MESSAGE = SystemMessage(content = "You are Cora, an intelligent and friendly AI assistant for Zava, a home improvement brand. You help customers with their DIY projects by understanding their needs and recommending the most suitable products from Zava's catalog.\n\nYour role is to:\n- Engage with the customer in natural conversation to understand their DIY goals.\n- Ask thoughtful questions to gather relevant project details.\n- Be brief in your responses.\n- Provide the best solution for the customer's problem and only recommend a relevant product within Zava's product catalog.\n- Search Zava's product database to identify 1 product by name that best match the customer's needs.\n- Clearly explain what each recommended Zava product is, why it's a good fit, and how it helps with their project.\n- When users provide images, analyze them carefully to understand what they show and how it relates to their DIY project.\n\n\nYour personality is:\n- Warm and welcoming, like a helpful store associate\n- Professional and knowledgeable, like a seasoned DIY expert\n- Curious and conversational—never assume, always clarify\n- Transparent and honest—if something isn't available, offer support anyway\n\nIf no matching products are found in Zava's catalog, say:\n\"Thanks for sharing those details! I've searched our catalog, but it looks like we don't currently have a product that fits your exact needs. If you'd like, I can suggest some alternatives or help you adjust your project requirements to see if something similar might work.\"")
+# Agent instructions for Cora AI assistant
+AGENT_INSTRUCTIONS = """You are Cora, an intelligent and friendly AI assistant for Zava, a home improvement brand. You help customers with their DIY projects by understanding their needs and recommending the most suitable products from Zava's catalog.
 
-async def initialize_mcp_client():
-    """Initialize the MCP client and connect to servers"""
-    global mcp_client
-    if mcp_client is None:
-        mcp_client = MCPClient()
+Your role is to:
+- Engage with the customer in natural conversation to understand their DIY goals.
+- Ask thoughtful questions to gather relevant project details.
+- Be brief in your responses.
+- Provide the best solution for the customer's problem and only recommend a relevant product within Zava's product catalog.
+- Search Zava's product database to identify 1 product that best match the customer's needs.
+- Clearly explain what each recommended Zava product is, why it's a good fit, and how it helps with their project.
+- When users provide images, analyze them carefully to understand what they show and how it relates to their DIY project.
+
+Your personality is:
+- Warm and welcoming, like a helpful store associate
+- Professional and knowledgeable, like a seasoned DIY expert
+- Curious and conversational—never assume, always clarify
+- Transparent and honest—if something isn't available, offer support anyway
+
+If no matching products are found in Zava's catalog, say:
+"Thanks for sharing those details! I've searched our catalog, but it looks like we don't currently have a product that fits your exact needs. If you'd like, I can suggest some alternatives or help you adjust your project requirements to see if something similar might work."
+"""
+
+async def initialize_agent():
+    """Initialize the Agent Framework agent using AzureAIClient"""
+    global agent_instance, credential_instance
+    if agent_instance is None:
         try:
-            # Connect to the Zava Sales Analysis MCP server (matches your mcp.json config)
-            await mcp_client.connect_stdio_server(
-                "zava-sales-analysis", 
-                "python", 
-                [
-                    "/workspace/src/python/mcp_server/sales_analysis/sales_analysis.py",
-                    "--stdio",
-                    "--RLS_USER_ID=00000000-0000-0000-0000-000000000000"
-                ],
-                {}
+            # Use AzureCliCredential like cora-agent-demo.py
+            credential_instance = AzureCliCredential()
+            
+            # Create AzureAIClient for Foundry project endpoint
+            client = AzureAIClient(
+                project_endpoint=ENDPOINT,
+                model_deployment_name=MODEL_DEPLOYMENT_NAME,
+                async_credential=credential_instance,
+                agent_name=AGENT_NAME,
             )
             
-            # Also connect to the customer sales server for product searches
-            await mcp_client.connect_stdio_server(
-                "zava-customer-sales", 
-                "python", 
-                [
-                    "/workspace/src/python/mcp_server/customer_sales/customer_sales.py",
-                    "--stdio",
-                    "--RLS_USER_ID=00000000-0000-0000-0000-000000000000"
+            # Create agent with the Azure AI client
+            agent_instance = client.create_agent(
+                name=AGENT_NAME,
+                instructions=AGENT_INSTRUCTIONS,
+                tools=[
+                    *create_mcp_tools(),
                 ],
-                {}
             )
-            
-            logger.info("MCP client initialized successfully")
+            logger.info("Agent Framework initialized successfully with AzureAIClient")
         except Exception as e:
-            logger.error(f"Failed to initialize MCP client: {e}")
-            mcp_client = None
+            logger.error(f"Failed to initialize Agent Framework: {e}")
+            import traceback
+            traceback.print_exc()
+            agent_instance = None
 
 # Store active connections
 class ConnectionManager:
@@ -360,76 +232,117 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
         logger.info("Client disconnected")
 
-async def simulate_ai_agent(user_message: str, image_url: Optional[str] = None) -> str:
+async def simulate_ai_agent(user_message: str, image_url: Optional[str] = None, session_id: str = "default") -> str:
     """
-    Process user message using Cora AI agent with MCP tools
+    Process user message using Cora AI agent with Agent Framework
     """
-    global mcp_client
+    global agent_instance, agent_threads
     
-    # Initialize MCP client if not already done
-    if mcp_client is None:
-        await initialize_mcp_client()
+    # Initialize agent if not already done
+    if agent_instance is None:
+        await initialize_agent()
     
-    # If MCP client is still None, fall back to simple responses
-    if mcp_client is None:
+    # If agent is still None, fall back to simple responses
+    if agent_instance is None:
         return "I'm sorry, I'm having trouble connecting to my tools right now. Please try again later."
     
     try:
-        # Create conversation messages
-        content_items = [TextContentItem(text=user_message)]
+        # Get or create thread for this session
+        if session_id not in agent_threads:
+            agent_threads[session_id] = agent_instance.get_new_thread()
         
-        # Add image if provided
+        thread = agent_threads[session_id]
+        
+        # Prepare message with image if provided
         if image_url:
-            # Convert relative URL to absolute file path
-            if image_url.startswith('/uploads/'):
-                filename = image_url.replace('/uploads/', '')
+            logger.info(f"Processing message with image: {image_url}")
+            
+            # Convert relative URL to file path
+            if image_url.startswith("/uploads/"):
+                filename = image_url.replace("/uploads/", "")
                 file_path = UPLOAD_DIR / filename
                 
                 if file_path.exists():
-                    # Get MIME type and encode image
+                    # Get MIME type and read image as bytes
                     mime_type = get_image_mime_type(filename)
-                    image_data = encodeImage(str(file_path), mime_type)
                     
-                    # Add image to content
-                    content_items.append(
-                        ImageContentItem(
-                            image_url=ImageUrl(url=image_data)
+                    # Read image file as raw bytes
+                    with open(file_path, "rb") as image_file:
+                        image_bytes = image_file.read()
+                    
+                    logger.info(f"Image loaded: {len(image_bytes)} bytes, MIME type: {mime_type}")
+                    
+                    # Create a ChatMessage with multimodal content using DataContent
+                    # Note: use 'contents' (plural) not 'content'
+                    message_with_image = [
+                        ChatMessage(
+                            role="user",
+                            contents=[
+                                TextContent(text=user_message),
+                                DataContent(data=image_bytes, media_type=mime_type)
+                            ]
                         )
-                    )
-                    logger.info(f"Added image to message: {filename}")
+                    ]
+                    
+                    logger.info(f"Sending message with image to agent: {user_message}")
+                    
+                    # Stream response from agent with image
+                    response_text = ""
+                    async for chunk in agent_instance.run_stream(message_with_image, thread=thread):
+                        if chunk.text:
+                            response_text += chunk.text
                 else:
                     logger.warning(f"Image file not found: {file_path}")
-        
-        messages = [
-            CORA_SYSTEM_MESSAGE,
-            UserMessage(content=content_items)
-        ]
-        
-        # Use MCP client to process the message with tools
-        await mcp_client.chatWithTools(messages)
-        
-        # Extract the final AI response
-        final_message = messages[-1]
-        if hasattr(final_message, 'content') and final_message.content:
-            return final_message.content
+                    # Fall back to text-only processing
+                    response_text = ""
+                    async for chunk in agent_instance.run_stream(user_message, thread=thread):
+                        if chunk.text:
+                            response_text += chunk.text
+            else:
+                logger.warning(f"Invalid image URL format: {image_url}")
+                # Fall back to text-only processing
+                response_text = ""
+                async for chunk in agent_instance.run_stream(user_message, thread=thread):
+                    if chunk.text:
+                        response_text += chunk.text
         else:
-            return "I processed your request, but I'm having trouble generating a response. Please try rephrasing your question."
+            # Stream response from agent (text only)
+            response_text = ""
+            async for chunk in agent_instance.run_stream(user_message, thread=thread):
+                if chunk.text:
+                    response_text += chunk.text
+        
+        return response_text if response_text else "I processed your request, but I'm having trouble generating a response. Please try rephrasing your question."
             
     except Exception as e:
         logger.error(f"Error in AI agent processing: {e}")
+        import traceback
+        traceback.print_exc()
         return f"I encountered an error while processing your request: {str(e)}. Please try again."
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize resources on startup"""
-    await initialize_mcp_client()
+    await initialize_agent()
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Clean up resources on shutdown"""
-    global mcp_client
-    if mcp_client:
-        await mcp_client.cleanup()
+    global agent_instance, credential_instance
+    if agent_instance:
+        try:
+            # Agent cleanup if needed
+            pass
+        except Exception as e:
+            logger.error(f"Error during agent cleanup: {e}")
+        agent_instance = None
+    
+    if credential_instance:
+        try:
+            await credential_instance.close()
+        except Exception as e:
+            logger.error(f"Error during credential cleanup: {e}")
+        credential_instance = None
 
 if __name__ == "__main__":
     uvicorn.run(
