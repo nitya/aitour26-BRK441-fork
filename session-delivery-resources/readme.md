@@ -8,6 +8,8 @@ Prior to delivering the workshop please:
 2.  Watch the video presentation
 3.  Ask questions of the content leads! We're here to help!
 
+> [!WARNING]
+> There are currently known errors when trying to run the sample in GitHub Codespaces. Therefore, it is recommended to run the sample locally.
 
 ## 📁 File Summary
 
